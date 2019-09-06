@@ -129,6 +129,8 @@ opts_chunk$set(autodep = TRUE)
 Load needed packages:
 
 <<load-packages,message=FALSE>>=
+# install.packages(c("grpgreg", "glmnet", "kernlab", "caret", "randomForest", "mboost",
+#                    "gbm", "geoGAM", "raster"))
 library(grpreg) # for grouped lasso
 library(glmnet) # for general lasso
 library(kernlab) # for support vector machines
@@ -136,7 +138,6 @@ library(caret) # for model tuning
 library(randomForest) # to fit random forest
 library(mboost) # for the boosting models with linear and spline terms  
 library(gbm) # for the boosting model with trees
-library(caret) # for the tuning with train
 library(geoGAM) # for the berne dataset
 library(raster) # for plotting as a raster
 library(parallel) # for parallel computing
@@ -406,8 +407,8 @@ f.tune.randomforest <- function(test.mtry, # mtry to test
   # set seed 
   set.seed(1)
   # fit random forest with mtry = test.mtry
-  rf.tune <- randomForest(x = d.ph10[, l.covar ],
-                          y = d.ph10[, "ph.0.10"],
+  rf.tune <- randomForest(x = d.cal[, l.covariates ],
+                          y = d.cal[, "ph.0.10"],
                           mtry = test.mtry)
   # return the mean squared error (mse) of this model fit
   return( tail(rf.tune$mse, n=1) )
