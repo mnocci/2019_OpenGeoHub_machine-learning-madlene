@@ -1,4 +1,4 @@
-## ----general-options,echo=FALSE------------------------------------------
+## ----general-options,echo=FALSE----------------------------------------
 
 library(knitr)
 # output code, but no warnings
@@ -8,7 +8,10 @@ opts_chunk$set(autodep = TRUE)
 # dep_auto() # print dependencies 
 
 
-## ----load-packages,message=FALSE-----------------------------------------
+
+## ----load-packages,message=FALSE---------------------------------------
+# install.packages(c("grpgreg", "glmnet", "kernlab", "caret", "randomForest", "mboost",
+#                    "gbm", "geoGAM", "raster"))
 library(grpreg) # for grouped lasso
 library(glmnet) # for general lasso
 library(kernlab) # for support vector machines
@@ -16,12 +19,12 @@ library(caret) # for model tuning
 library(randomForest) # to fit random forest
 library(mboost) # for the boosting models with linear and spline terms  
 library(gbm) # for the boosting model with trees
-library(caret) # for the tuning with train
 library(geoGAM) # for the berne dataset
 library(raster) # for plotting as a raster
 library(parallel) # for parallel computing
 
-## ----read-in-data--------------------------------------------------------
+
+## ----read-in-data------------------------------------------------------
 dim(berne)
 # Continuous response 
 d.ph10 <- berne[berne$dataset == "calibration" & !is.na(berne$ph.0.10), ]
@@ -38,17 +41,19 @@ d.drain <- d.drain[complete.cases(d.drain[13:ncol(d.drain)]), ]
 # covariates start at col 13
 l.covar <- names(d.ph10[, 13:ncol(d.ph10)])
 
-## ----apply-example-------------------------------------------------------
+
+## ----apply-example-----------------------------------------------------
 # loop 
 # first create a vector to save the results
 t.result <- c()
-for( ii in 1:10){ t.result <- ii^2}
+for( ii in 1:10 ){ t.result <- c(t.result, ii^2) }
 # the same as apply
 t.result <- sapply(1:10, function(ii){ ii^2 })
 # of course, this example is even shorter using:
-t.result <- 1:10^2
+t.result <- (1:10)^2
 
-## ----lasso-continuous-response,cache=TRUE--------------------------------
+
+## ----lasso-continuous-response,cache=TRUE------------------------------
 
 # define groups: dummy coding of a factor is treated as group
 # find factors
@@ -73,7 +78,8 @@ ph.cvfit <- cv.grpreg(X = XX, y = d.ph10$ph.0.10,
                       penalty = "grLasso",
                       returnY = T) # access CV results
 
-## ----lasso-predictions---------------------------------------------------
+
+## ----lasso-predictions-------------------------------------------------
 # choose optimal lambda: CV minimum error + 1 SE (see glmnet)
 l.se <- ph.cvfit$cvse[ ph.cvfit$min ] + ph.cvfit$cve[ ph.cvfit$min ]
 idx.se <- min( which( ph.cvfit$cve < l.se ) ) - 1
@@ -86,10 +92,12 @@ t.pred.val <-  predict(ph.cvfit, X = newXX,
 # get CV predictions, e.g. to compute R2
 ph.lasso.cv.pred <- ph.cvfit$Y[,idx.se]
 
-## ----lasso-get-model-----------------------------------------------------
+
+## ----lasso-get-model---------------------------------------------------
 # get the non-zero coefficients:
 t.coef <- ph.cvfit$fit$beta[, idx.se ]
 t.coef[ t.coef > 0 ]
+
 
 ## ----lasso-plot-cv,echo=FALSE,fig.width=7,fig.height=4.5, fig.align='center', out.width='0.8\\textwidth',fig.cap = "Cross validation error plotted against the tuning parameter lambda. The dashed line indicates lambda at minimal error, the dotted darkgrey line is the optimal lambda with minimal error + 1 SE."----
 
@@ -97,7 +105,8 @@ plot(ph.cvfit)
 abline( h = l.se, col = "grey", lty = "dotted")
 abline( v = log( ph.cvfit$lambda[ idx.se ]), col = "grey30", lty = "dotted")
 
-## ----lasso-multinomial-response,cache = TRUE-----------------------------
+
+## ----lasso-multinomial-response,cache = TRUE---------------------------
 
 # create model matrix for drainage classes
 # use a subset of covariates only, because model optimization for 
@@ -111,7 +120,8 @@ drain.cvfit <- cv.glmnet( XX, d.drain$dclass, nfold = 10,
                           family = "multinomial", 
                           type.multinomial = "grouped")
 
-## ----lasso-multinomial-response-coeffs,cache=TRUE------------------------
+
+## ----lasso-multinomial-response-coeffs,cache=TRUE----------------------
 
 drain.fit <- glmnet( XX, d.drain$dclass,
                      family = "multinomial", 
@@ -122,7 +132,8 @@ drain.fit <- glmnet( XX, d.drain$dclass,
 # drain.fit$beta$moderate
 # drain.fit$beta$poor
 
-## ----svm,cache=TRUE------------------------------------------------------
+
+## ----svm,cache=TRUE----------------------------------------------------
 
 # We have to set up the design matrix ourselfs 
 # (without intercept, hence remove first column) 
@@ -166,6 +177,7 @@ svm.model <- train(x = XX,
 # svm.model <- svm.tune1
 
 
+
 ## ----svm-validation-plots,fig.width=10,fig.height=5, fig.align='center', out.width='0.85\\textwidth',fig.cap = "Predictions from cross-validation (left) and the validation dataset (right) plotted against the observed values (dashed: 1:1-line, green: lowess scatterplott smoother)."----
 # create validation plots with lowess scatterplot smoothers
 # for cross-validation
@@ -188,7 +200,8 @@ plot(t.pred.val, d.ph10.val[, "ph.0.10"],
 abline(0,1, lty = "dashed", col = "grey")
 lines(lowess(t.pred.val, d.ph10.val[, "ph.0.10"]), col = "darkgreen", lwd = 2)
 
-## ----random-forest,cache=TRUE--------------------------------------------
+
+## ----random-forest,cache=TRUE------------------------------------------
 
 # Fit a random forest with default parameters 
 # (often results are already quite good)
@@ -206,8 +219,8 @@ f.tune.randomforest <- function(test.mtry, # mtry to test
   # set seed 
   set.seed(1)
   # fit random forest with mtry = test.mtry
-  rf.tune <- randomForest(x = d.ph10[, l.covar ],
-                          y = d.ph10[, "ph.0.10"],
+  rf.tune <- randomForest(x = d.cal[, l.covariates ],
+                          y = d.cal[, "ph.0.10"],
                           mtry = test.mtry)
   # return the mean squared error (mse) of this model fit
   return( tail(rf.tune$mse, n=1) )
@@ -244,13 +257,15 @@ rf.model.tuned <- randomForest(x = d.ph10[, l.covar ],
                                y = d.ph10[, "ph.0.10"],
                                mtry = s.mtry)
 
+
 ## ----random-forest-plot-mtry,fig.width=6,fig.height=4.7, fig.align='center',fig.pos='!h',out.width='0.6\\textwidth',fig.cap = "Tuning parameter mtry plotted against the out-of-bag mean squared error (grey line: lowess smoothing line, dashed line: mtry at minimum MSE)."----
 plot( mtry.oob$mtry.n, mtry.oob$mtry.OOBe, pch = 4, 
       ylab = "out-of-bag MSE error", xlab = "mtry")
 abline(v = s.mtry, lty = "dashed", col = "darkgrey")
 lines( lowess( mtry.oob$mtry.n, mtry.oob$mtry.OOBe ), lwd = 1.5, col = "darkgrey")
 
-## ----boosted-trees-tuning,cache=TRUE-------------------------------------
+
+## ----boosted-trees-tuning,cache=TRUE-----------------------------------
 
 # create a grid of the tuning parameters to be tested, 
 # main tuning parameters are: 
@@ -283,6 +298,7 @@ gbm.model <- train(x=d.ph10[, l.covar ],
 # print optimal tuning parameter
 gbm.model$bestTune
 
+
 ## ----boosted-trees-map,fig.width=5,fig.height=5, fig.align='center', out.width='0.7\\textwidth',fig.cap = "Predictions computed with an optimized boosted trees model of topsoil pH (0--10 cm) for a very small part of the Berne study region (white areas are streets, developped areas or forests, CRAN does not accept larger datasets)."----
 
 # compute predictions for the small part of the study area
@@ -299,6 +315,7 @@ proj4string(berne.grid) <- CRS("+init=epsg:21781")
 # create a raster object from the spatial point dataframe 
 gridded(berne.grid) <- TRUE
 plot(raster(berne.grid, layer = "pred"))
+
 
 
 ## ----boosted-trees-partial-dependencies,fig.pos="h",fig.width=7,fig.height=7, fig.align='center', out.width='0.8\\textwidth',fig.cap = "Partial dependence plots of boosted trees model for the four most important covariates."----
@@ -324,7 +341,8 @@ for( name in t.names ){
 #    or a title (main = )
 
 
-## ----glmboost,cache=TRUE-------------------------------------------------
+
+## ----glmboost,cache=TRUE-----------------------------------------------
 # Fit model
 ph.glmboost <- glmboost(ph.0.10 ~., data = d.ph10[ c("ph.0.10", l.covar)],
                         control = boost_control(mstop = 200),
@@ -342,10 +360,12 @@ mstop(ph.glmboost.cv)
 ## print model with fitted coefficents 
 # ph.glmboost[ mstop(ph.glmboost.cv)]
 
+
 ## ----glmboost-plot,fig.width=7,fig.height=5, fig.align='center', out.width='0.8\\textwidth',fig.cap = "Path of cross validation error along the boosting iterations.", echo = FALSE----
 plot(ph.glmboost.cv)
 
-## ----gamboost,cache=TRUE,message=FALSE-----------------------------------
+
+## ----gamboost,cache=TRUE,message=FALSE---------------------------------
 
 # quick set up formula
 
@@ -384,7 +404,8 @@ ph.gamboost.cv <- cvrisk(ph.gamboost,
                          folds = mboost::cv(model.weights(ph.gamboost), 
                                             type = "kfold"))
 
-## ----gamboost-results----------------------------------------------------
+
+## ----gamboost-results--------------------------------------------------
 # print optimal mstop
 mstop(ph.gamboost.cv)
 
@@ -396,17 +417,21 @@ length( t.sel <-  summary( ph.gamboost[ mstop(ph.glmboost.cv)] )$selprob )
 # Most often selected were: 
 summary( ph.gamboost[ mstop(ph.glmboost.cv)] )$selprob[1:5]  
 
+
 ## ----gamboost-partial-plots,echo=FALSE,fig.width=7,fig.height=6, fig.align='center', out.width='0.8\\textwidth',fig.cap = "Residual plots of the 4 covariates with highest selection frequency."----
 par(mfrow=c(2,2) )
 plot(ph.gamboost[ mstop(ph.glmboost.cv)], which = names(t.sel[1:4]) )
+
 
 ## ----gamboost-partial-plots-spatial,echo=FALSE,fig.width=7,fig.height=5, fig.align='center', out.width='0.8\\textwidth',fig.cap = "Modelled smooth spatial surface based on the coordinates."----
 par(mfrow=c(1,1) )
 plot(ph.gamboost[ mstop(ph.glmboost.cv)], which = grep("bspat", names(t.sel), value = T) )
 
-## ----session-info,results='asis'-----------------------------------------
+
+## ----session-info,results='asis'---------------------------------------
 toLatex(sessionInfo(), locale = FALSE)
 
-## ----export-r-code,echo=FALSE,result="hide"------------------------------
-purl("OpenGeoHub-machine-learning-training-1.Rnw")
+
+## ----export-r-code,echo=FALSE,result="hide"----------------------------
+# purl("OpenGeoHub-machine-learning-training-1.Rnw")
 

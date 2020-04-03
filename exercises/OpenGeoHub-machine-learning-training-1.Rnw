@@ -190,11 +190,11 @@ Example, how to replace a \texttt{for} by a \texttt{sapply}:
 # loop 
 # first create a vector to save the results
 t.result <- c()
-for( ii in 1:10){ t.result <- ii^2}
+for( ii in 1:10 ){ t.result <- c(t.result, ii^2) }
 # the same as apply
 t.result <- sapply(1:10, function(ii){ ii^2 })
 # of course, this example is even shorter using:
-t.result <- 1:10^2
+t.result <- (1:10)^2
 @
 
 
