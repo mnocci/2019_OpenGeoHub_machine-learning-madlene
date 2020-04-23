@@ -1,4 +1,4 @@
-## ----general-options,echo=FALSE----------------------------------------
+## ----general-options,echo=FALSE-----------------------------------------
 
 library(knitr)
 # output code, but no warnings
@@ -9,7 +9,7 @@ opts_chunk$set(autodep = TRUE)
 
 
 
-## ----load-packages,message=FALSE---------------------------------------
+## ----load-packages,message=FALSE----------------------------------------
 # install.packages(c("grpgreg", "glmnet", "kernlab", "caret", "randomForest", "mboost",
 #                    "gbm", "geoGAM", "raster"))
 library(grpreg) # for grouped lasso
@@ -24,7 +24,8 @@ library(raster) # for plotting as a raster
 library(parallel) # for parallel computing
 
 
-## ----read-in-data------------------------------------------------------
+## ----read-in-data-------------------------------------------------------
+data(berne)
 dim(berne)
 # Continuous response 
 d.ph10 <- berne[berne$dataset == "calibration" & !is.na(berne$ph.0.10), ]
@@ -42,7 +43,7 @@ d.drain <- d.drain[complete.cases(d.drain[13:ncol(d.drain)]), ]
 l.covar <- names(d.ph10[, 13:ncol(d.ph10)])
 
 
-## ----apply-example-----------------------------------------------------
+## ----apply-example------------------------------------------------------
 # loop 
 # first create a vector to save the results
 t.result <- c()
@@ -53,7 +54,7 @@ t.result <- sapply(1:10, function(ii){ ii^2 })
 t.result <- (1:10)^2
 
 
-## ----lasso-continuous-response,cache=TRUE------------------------------
+## ----lasso-continuous-response,cache=TRUE-------------------------------
 
 # define groups: dummy coding of a factor is treated as group
 # find factors
@@ -79,7 +80,7 @@ ph.cvfit <- cv.grpreg(X = XX, y = d.ph10$ph.0.10,
                       returnY = T) # access CV results
 
 
-## ----lasso-predictions-------------------------------------------------
+## ----lasso-predictions--------------------------------------------------
 # choose optimal lambda: CV minimum error + 1 SE (see glmnet)
 l.se <- ph.cvfit$cvse[ ph.cvfit$min ] + ph.cvfit$cve[ ph.cvfit$min ]
 idx.se <- min( which( ph.cvfit$cve < l.se ) ) - 1
@@ -93,7 +94,7 @@ t.pred.val <-  predict(ph.cvfit, X = newXX,
 ph.lasso.cv.pred <- ph.cvfit$Y[,idx.se]
 
 
-## ----lasso-get-model---------------------------------------------------
+## ----lasso-get-model----------------------------------------------------
 # get the non-zero coefficients:
 t.coef <- ph.cvfit$fit$beta[, idx.se ]
 t.coef[ t.coef > 0 ]
@@ -106,7 +107,7 @@ abline( h = l.se, col = "grey", lty = "dotted")
 abline( v = log( ph.cvfit$lambda[ idx.se ]), col = "grey30", lty = "dotted")
 
 
-## ----lasso-multinomial-response,cache = TRUE---------------------------
+## ----lasso-multinomial-response,cache = TRUE----------------------------
 
 # create model matrix for drainage classes
 # use a subset of covariates only, because model optimization for 
@@ -121,7 +122,7 @@ drain.cvfit <- cv.glmnet( XX, d.drain$dclass, nfold = 10,
                           type.multinomial = "grouped")
 
 
-## ----lasso-multinomial-response-coeffs,cache=TRUE----------------------
+## ----lasso-multinomial-response-coeffs,cache=TRUE-----------------------
 
 drain.fit <- glmnet( XX, d.drain$dclass,
                      family = "multinomial", 
@@ -133,7 +134,7 @@ drain.fit <- glmnet( XX, d.drain$dclass,
 # drain.fit$beta$poor
 
 
-## ----svm,cache=TRUE----------------------------------------------------
+## ----svm,cache=TRUE-----------------------------------------------------
 
 # We have to set up the design matrix ourselfs 
 # (without intercept, hence remove first column) 
@@ -201,7 +202,7 @@ abline(0,1, lty = "dashed", col = "grey")
 lines(lowess(t.pred.val, d.ph10.val[, "ph.0.10"]), col = "darkgreen", lwd = 2)
 
 
-## ----random-forest,cache=TRUE------------------------------------------
+## ----random-forest,cache=TRUE-------------------------------------------
 
 # Fit a random forest with default parameters 
 # (often results are already quite good)
@@ -265,7 +266,7 @@ abline(v = s.mtry, lty = "dashed", col = "darkgrey")
 lines( lowess( mtry.oob$mtry.n, mtry.oob$mtry.OOBe ), lwd = 1.5, col = "darkgrey")
 
 
-## ----boosted-trees-tuning,cache=TRUE-----------------------------------
+## ----boosted-trees-tuning,cache=TRUE------------------------------------
 
 # create a grid of the tuning parameters to be tested, 
 # main tuning parameters are: 
@@ -284,7 +285,9 @@ gbm.grid <- expand.grid(
 set.seed(291201945)
 
 # train the gbm model 
-gbm.model <- train(x=d.ph10[, l.covar ],
+# Remove "ge_caco3" throws an error since Package gbm 2.1.5, 
+# this bug is reported: https://github.com/gbm-developers/gbm/issues/40
+gbm.model <- train(x=d.ph10[, l.covar[-c(50)]  ], 
                    y=d.ph10[, "ph.0.10"],
                    method = "gbm", # choose "generalized boosted regression model"
                    tuneGrid = gbm.grid,
@@ -342,7 +345,7 @@ for( name in t.names ){
 
 
 
-## ----glmboost,cache=TRUE-----------------------------------------------
+## ----glmboost,cache=TRUE------------------------------------------------
 # Fit model
 ph.glmboost <- glmboost(ph.0.10 ~., data = d.ph10[ c("ph.0.10", l.covar)],
                         control = boost_control(mstop = 200),
@@ -365,7 +368,7 @@ mstop(ph.glmboost.cv)
 plot(ph.glmboost.cv)
 
 
-## ----gamboost,cache=TRUE,message=FALSE---------------------------------
+## ----gamboost,cache=TRUE,message=FALSE----------------------------------
 
 # quick set up formula
 
@@ -405,7 +408,7 @@ ph.gamboost.cv <- cvrisk(ph.gamboost,
                                             type = "kfold"))
 
 
-## ----gamboost-results--------------------------------------------------
+## ----gamboost-results---------------------------------------------------
 # print optimal mstop
 mstop(ph.gamboost.cv)
 
@@ -428,10 +431,10 @@ par(mfrow=c(1,1) )
 plot(ph.gamboost[ mstop(ph.glmboost.cv)], which = grep("bspat", names(t.sel), value = T) )
 
 
-## ----session-info,results='asis'---------------------------------------
+## ----session-info,results='asis'----------------------------------------
 toLatex(sessionInfo(), locale = FALSE)
 
 
-## ----export-r-code,echo=FALSE,result="hide"----------------------------
+## ----export-r-code,echo=FALSE,result="hide"-----------------------------
 # purl("OpenGeoHub-machine-learning-training-1.Rnw")
 

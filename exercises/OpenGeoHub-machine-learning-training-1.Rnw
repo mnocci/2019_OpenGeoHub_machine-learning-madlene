@@ -152,6 +152,7 @@ Hint: The processing of this code is quite time consuming on a laptop. Normaly, 
 Load the data, select the calibration set and remove missing values in covariates: 
 
 <<read-in-data>>=
+data(berne)
 dim(berne)
 # Continuous response 
 d.ph10 <- berne[berne$dataset == "calibration" & !is.na(berne$ph.0.10), ]
@@ -493,7 +494,9 @@ gbm.grid <- expand.grid(
 set.seed(291201945)
 
 # train the gbm model 
-gbm.model <- train(x=d.ph10[, l.covar ],
+# Remove "ge_caco3" throws an error since Package gbm 2.1.5, 
+# this bug is reported: https://github.com/gbm-developers/gbm/issues/40
+gbm.model <- train(x=d.ph10[, l.covar[-c(50)]  ], 
                    y=d.ph10[, "ph.0.10"],
                    method = "gbm", # choose "generalized boosted regression model"
                    tuneGrid = gbm.grid,
